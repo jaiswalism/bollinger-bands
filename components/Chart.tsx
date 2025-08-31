@@ -39,11 +39,13 @@ export default function ChartComponent() {
       registerIndicator({
         name: BB_INDICATOR_NAME,
         shortName: 'BB',
-        calcParams: [20, 2, 0],
+        calcParams: [20, 2, 0], // Default params
         precision: 2,
         calc: (data: KLineData[], indicator: any) => {
           const { params } = indicator;
           const [length, stdDevMultiplier, offset] = params || [20, 2, 0];
+          
+          console.log('BB Calc called with params:', { length, stdDevMultiplier, offset });
           
           const result: any[] = [];
 
@@ -53,6 +55,7 @@ export default function ChartComponent() {
               continue;
             }
 
+            // Calculate the base values first
             const slice = data.slice(i - length + 1, i + 1);
             const closePrices = slice.map(d => d.close);
 
@@ -65,18 +68,37 @@ export default function ChartComponent() {
             const avgSquaredDiff = squaredDiffs.reduce((acc, val) => acc + val, 0) / length;
             const standardDeviation = Math.sqrt(avgSquaredDiff);
 
-            // Calculate bands
+            // Calculate bands with proper stdDev multiplier
             const upper = sma + (standardDeviation * stdDevMultiplier);
             const lower = sma - (standardDeviation * stdDevMultiplier);
 
-            result.push({
-              value: sma,
-              upper: upper,
-              lower: lower
-            });
+            // Apply offset by placing the result at the offset position
+            const targetIndex = i + offset;
+            while (result.length <= targetIndex) {
+              result.push({});
+            }
+
+            if (targetIndex >= 0 && targetIndex < data.length + Math.abs(offset)) {
+              result[targetIndex] = {
+                value: sma,
+                upper: upper,
+                lower: lower
+              };
+            }
           }
 
-          return result;
+          // If offset is negative, we need to trim the end
+          if (offset < 0) {
+            return result.slice(0, data.length);
+          }
+          
+          // If offset is positive, pad the beginning
+          if (offset > 0) {
+            const padding = Array(offset).fill({});
+            return [...padding, ...result].slice(0, data.length);
+          }
+
+          return result.slice(0, data.length);
         },
       });
       indicatorRegistered = true;
@@ -114,7 +136,13 @@ export default function ChartComponent() {
     if (!chartRef.current || ohlcvData.length === 0 || !bbAdded) return;
     
     const chart = chartRef.current;
+    
+    console.log('Updating BB with new inputs:', bbInputs);
 
+    // Remove existing indicator first
+    chart.removeIndicator('candle_pane', BB_INDICATOR_NAME);
+    
+    // Build figures array based on display settings
     const figures = [];
     if (bbStyles.basis.display) {
       figures.push({ 
@@ -124,7 +152,7 @@ export default function ChartComponent() {
         styles: () => ({ 
           dashValue: bbStyles.basis.style === 'dashed' ? [2, 2] : [1, 0], 
           color: bbStyles.basis.color, 
-          lineWidth: bbStyles.basis.width 
+          size: bbStyles.basis.width 
         }) 
       });
     }
@@ -136,7 +164,7 @@ export default function ChartComponent() {
         styles: () => ({ 
           dashValue: bbStyles.upper.style === 'dashed' ? [2, 2] : [1, 0], 
           color: bbStyles.upper.color, 
-          lineWidth: bbStyles.upper.width 
+          size: bbStyles.upper.width 
         }) 
       });
     }
@@ -148,25 +176,28 @@ export default function ChartComponent() {
         styles: () => ({ 
           dashValue: bbStyles.lower.style === 'dashed' ? [2, 2] : [1, 0], 
           color: bbStyles.lower.color, 
-          lineWidth: bbStyles.lower.width 
+          size: bbStyles.lower.width 
         }) 
       });
     }
     
-    chart.overrideIndicator({
-        name: BB_INDICATOR_NAME,
-        calcParams: [bbInputs.length, bbInputs.stdDev, bbInputs.offset],
-        figures: figures,
-        styles: {
-            area: {
-                style: 'fill',
-                color: hexToRgba(bbStyles.background.color, bbStyles.background.opacity),
-                toFigureKey: 'upper',
-                fromFigureKey: 'lower',
-                visible: bbStyles.background.display,
-            }
+    // Create the indicator with updated parameters and styles
+    const result = chart.createIndicator({
+      name: BB_INDICATOR_NAME,
+      calcParams: [bbInputs.length, bbInputs.stdDev, bbInputs.offset], // This is the key fix!
+      figures: figures,
+      styles: {
+        area: {
+          style: 'fill',
+          color: hexToRgba(bbStyles.background.color, bbStyles.background.opacity),
+          toFigureKey: 'upper',
+          fromFigureKey: 'lower',
+          visible: bbStyles.background.display,
         }
-    });
+      }
+    }, true, { id: 'candle_pane' });
+    
+    console.log('BB indicator recreated with result:', result);
 
   }, [bbInputs, bbStyles, bbAdded, ohlcvData]);
   
@@ -177,7 +208,7 @@ export default function ChartComponent() {
         const result = chartRef.current.createIndicator({
             name: BB_INDICATOR_NAME,
             calcParams: [bbInputs.length, bbInputs.stdDev, bbInputs.offset],
-        }, true, { id: 'candle_pane' }); // Force it on the main candlestick pane
+        }, true, { id: 'candle_pane' });
         
         console.log('createIndicator result:', result);
         setBbAdded(true);
