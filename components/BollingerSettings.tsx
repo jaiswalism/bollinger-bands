@@ -20,13 +20,23 @@ export default function BollingerSettings({
 }: BollingerSettingsProps) {
   const [activeTab, setActiveTab] = useState<'Inputs' | 'Style'>('Inputs');
 
-  const handleInputChange = (field: keyof BollingerInputs, value: string | number) => {
-    onInputsChange({ ...inputs, [field]: Number(value) });
+  const handleInputChange = (field: keyof BollingerInputs, value: string) => {
+    // If the parsed number is NaN (from an empty string), default to 0 to prevent crashes.
+    const numericValue = Number(value);
+    onInputsChange({ ...inputs, [field]: isNaN(numericValue) ? 0 : numericValue });
   };
   
   const handleStyleChange = (band: keyof BollingerStyles, field: string, value: any) => {
     const newStyles = JSON.parse(JSON.stringify(styles));
-    (newStyles[band] as any)[field] = value;
+    
+    // For the 'width' field, default to 1 if the input is cleared to prevent NaN errors.
+    if (field === 'width') {
+        const numericValue = parseInt(value, 10);
+        (newStyles[band] as any)[field] = isNaN(numericValue) ? 1 : numericValue;
+    } else {
+        (newStyles[band] as any)[field] = value;
+    }
+
     onStylesChange(newStyles);
   };
   
@@ -78,7 +88,7 @@ export default function BollingerSettings({
             <input type="checkbox" checked={styles.basis.display} onChange={(e) => handleStyleChange('basis', 'display', e.target.checked)} />
             <span>Basis</span>
             <input type="color" value={styles.basis.color} onChange={(e) => handleStyleChange('basis', 'color', e.target.value)} className="bg-transparent" />
-            <input type="number" value={styles.basis.width} min="1" max="10" onChange={(e) => handleStyleChange('basis', 'width', parseInt(e.target.value))} className="w-12 bg-gray-700 p-1 rounded" />
+            <input type="number" value={styles.basis.width} min="1" max="10" onChange={(e) => handleStyleChange('basis', 'width', e.target.value)} className="w-12 bg-gray-700 p-1 rounded" />
             <select value={styles.basis.style} onChange={(e) => handleStyleChange('basis', 'style', e.target.value)} className="bg-gray-700 p-1 rounded">
               {lineStyleOptions.map(s => <option key={s} value={s}>{s}</option>)}
             </select>
@@ -89,7 +99,7 @@ export default function BollingerSettings({
             <input type="checkbox" checked={styles.upper.display} onChange={(e) => handleStyleChange('upper', 'display', e.target.checked)} />
             <span>Upper</span>
             <input type="color" value={styles.upper.color} onChange={(e) => handleStyleChange('upper', 'color', e.target.value)} className="bg-transparent" />
-            <input type="number" value={styles.upper.width} min="1" max="10" onChange={(e) => handleStyleChange('upper', 'width', parseInt(e.target.value))} className="w-12 bg-gray-700 p-1 rounded" />
+            <input type="number" value={styles.upper.width} min="1" max="10" onChange={(e) => handleStyleChange('upper', 'width', e.target.value)} className="w-12 bg-gray-700 p-1 rounded" />
             <select value={styles.upper.style} onChange={(e) => handleStyleChange('upper', 'style', e.target.value)} className="bg-gray-700 p-1 rounded">
               {lineStyleOptions.map(s => <option key={s} value={s}>{s}</option>)}
             </select>
@@ -100,7 +110,7 @@ export default function BollingerSettings({
             <input type="checkbox" checked={styles.lower.display} onChange={(e) => handleStyleChange('lower', 'display', e.target.checked)} />
             <span>Lower</span>
             <input type="color" value={styles.lower.color} onChange={(e) => handleStyleChange('lower', 'color', e.target.value)} className="bg-transparent" />
-            <input type="number" value={styles.lower.width} min="1" max="10" onChange={(e) => handleStyleChange('lower', 'width', parseInt(e.target.value))} className="w-12 bg-gray-700 p-1 rounded" />
+            <input type="number" value={styles.lower.width} min="1" max="10" onChange={(e) => handleStyleChange('lower', 'width', e.target.value)} className="w-12 bg-gray-700 p-1 rounded" />
             <select value={styles.lower.style} onChange={(e) => handleStyleChange('lower', 'style', e.target.value)} className="bg-gray-700 p-1 rounded">
               {lineStyleOptions.map(s => <option key={s} value={s}>{s}</option>)}
             </select>
